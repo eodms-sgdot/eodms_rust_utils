@@ -1,4 +1,4 @@
-use num_traits::PrimInt;
+use num_traits::{PrimInt, ToPrimitive};
 
 const KIB: u64 = 1024;
 const MIB: u64 = KIB.pow(2);
@@ -6,14 +6,14 @@ const GIB: u64 = KIB.pow(3);
 const TIB: u64 = KIB.pow(4);
 const PIB: u64 = KIB.pow(5);
 
-pub fn format_bytes<T: PrimInt>(bytes: T, width: Option<usize>, decimals: Option<usize>) -> String {
+pub fn format_bytes<T: ToPrimitive>(bytes: T, width: Option<usize>, decimals: Option<usize>) -> String {
 	let width = width.unwrap_or(6);
 	let decimals = decimals.unwrap_or(2);
 	let float = match bytes.to_f64() {
 		Some(f) => f,
 		None => return "".to_string()
 	};
-	let strlen = float.to_string().len(); 
+	let strlen = (float as i64).to_string().len();
 	let format_string = match strlen {
 		0..=3 => {
 			format!("{:>1$} B",float,width)
@@ -35,6 +35,20 @@ pub fn format_bytes<T: PrimInt>(bytes: T, width: Option<usize>, decimals: Option
 		},
 	};
 	format_string
+}
+
+pub fn format_rate<T: PrimInt>(bytes: T, duration: f64, width: Option<usize>, decimals: Option<usize>) -> String {
+	let float = match bytes.to_f64() {
+		Some(f) => f,
+		None => return "".to_string()
+	};
+	let rate = match float / duration {
+		x if x.is_infinite() => float,
+		x => x,
+	};
+	let mut str = format_bytes(rate,width,decimals);
+	str.push_str("/s");
+	str
 }
 
 #[cfg(test)]
@@ -90,5 +104,20 @@ mod tests {
 	fn format_biggest_u64() {
 		let result = format_bytes(18_446_744_073_709_551_615u64, None, None);
 		assert_eq!(result.as_str(), "16384.00 PiB");
+	}
+	#[test]
+	fn format_rate_test1() {
+		let result = format_rate(1000000,10.0, None, None);
+		assert_eq!(result.as_str(), " 97.66 KiB/s");
+	}
+	#[test]
+	fn format_rate_test2() {
+		let result = format_rate(74000200,15.34, None, None);
+		assert_eq!(result.as_str(), "  4.60 MiB/s");
+	}
+	#[test]
+	fn format_rate_zerosecs() {
+		let result = format_rate(888888888,0.0, None, None);
+		assert_eq!(result.as_str(), "847.71 MiB/s");
 	}
 }
