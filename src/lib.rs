@@ -1,5 +1,7 @@
 use num_traits::{PrimInt, ToPrimitive};
 
+pub mod file;
+
 const KIB: u64 = 1024;
 const MIB: u64 = KIB.pow(2);
 const GIB: u64 = KIB.pow(3);
