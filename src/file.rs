@@ -1,5 +1,4 @@
 use std::path::{Path,PathBuf};
-use std::fs;
 
 #[derive(Debug)]
 pub enum DirError {
