@@ -1,6 +1,8 @@
 use num_traits::{PrimInt, ToPrimitive};
 
 pub mod file;
+pub mod signal;
+pub mod dropbox;
 
 const KIB: u64 = 1024;
 const MIB: u64 = KIB.pow(2);
