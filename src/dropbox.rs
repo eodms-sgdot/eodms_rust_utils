@@ -9,9 +9,9 @@ use regex::Regex;
 use tokio::time::{Duration,sleep};
 
 use crate::file::{DirError,directory_exists};
-use crate::signal::{Signal,SignalType};
+use crate::signal::Signal;
 
-const DEFAULT_SLEEP_INTERVAL: u64 = 5;
+const DEFAULT_SLEEP_INTERVAL: u64 = 5000;
 
 pub struct DropBoxDirs<'a> {
 	pub target: &'a str,
@@ -28,12 +28,13 @@ pub struct DropBoxes {
 	pub processed: PathBuf,
 }
 
-type HandlerFn = Box<dyn Fn(DropBoxes,Vec<String>) -> BoxFuture<'static,Result<(),DropBoxError>> + Send + Sync>;
+type HandlerFn<T> = Box<dyn Fn(DropBoxes,Vec<String>,T) -> BoxFuture<'static,Result<(),DropBoxError>> + Send + Sync>;
 
-pub struct DropBox {
+pub struct DropBox<T> {
 	dropboxes: DropBoxes,
 	target_filter: Option<Regex>,
-	handler: HandlerFn,
+	handler: HandlerFn<T>,
+	data: T,
 	pub signal: Signal,
 }
 
@@ -49,6 +50,7 @@ pub enum DropBoxError {
 	Path(DirError),
 	Regex(regex::Error),
 	IO(IOError),
+	Misc(String),
 }
 
 impl From<regex::Error> for DropBoxError {
@@ -69,12 +71,13 @@ impl From<IOError> for DropBoxError {
 	}
 }
 
-impl DropBox {
+impl<T: Clone> DropBox<T> {
 	pub fn new(
 				dirs:    DropBoxDirs<'_>,
 				rxstr:   Option<String>,
-				handler: HandlerFn,
-			) -> Result<DropBox,DropBoxError> {
+				handler: HandlerFn<T>,
+				data: T,
+			) -> Result<DropBox<T>,DropBoxError> {
 
 		let rx = match rxstr {
 			Some(s) => Some(Regex::new(&s)?),
@@ -90,10 +93,11 @@ impl DropBox {
 			},
 			target_filter: rx,
 			handler,
+			data,
 			signal,
 		})
 	}
-	pub fn list(&self, dirtype: DropBoxDir) -> Result<Vec<String>,DropBoxError> {
+	pub async fn list(&self, dirtype: DropBoxDir) -> Result<Vec<String>,DropBoxError> {
 		let dir = match dirtype {
 			DropBoxDir::Target => &self.dropboxes.target,
 			DropBoxDir::Error => &self.dropboxes.error,
@@ -125,43 +129,22 @@ impl DropBox {
 	}
 
 	pub async fn monitor(&self, sleep_interval: Option<u64>) -> Result<(),DropBoxError> {
-		let mut signal_receiver = self.signal.subscribe();
 		let sleep_time = if let Some(s) = sleep_interval {
-			Duration::from_secs(s)
+			Duration::from_millis(s)
 		} else {
-			Duration::from_secs(DEFAULT_SLEEP_INTERVAL)
+			Duration::from_millis(DEFAULT_SLEEP_INTERVAL)
 		};
-		info!("Dropbox monitor sleeping {} seconds for every iteration",sleep_time.as_secs());
+		info!("Dropbox monitor sleeping {} milliseconds for every iteration",sleep_time.as_millis());
 		loop {
-			tokio::select! {
-				signal = signal_receiver.recv() => {
-					match signal {
-						Ok(s) => {
-							match s {
-								SignalType::Shutdown => {
-									info!("Received shutdown signal, quitting");
-									return Ok(());
-								},
-								_ => {
-								},
-							}
-						},
-						Err(e) => {
-							error!("signal: {}",e);
-						}
-					}
-				},
-			};
-			let files = self.list(DropBoxDir::Target)?;
+			let files = self.list(DropBoxDir::Target).await?;
 			if !files.is_empty() {
 				info!("Processing {} files",files.len());
 				debug!("Files:\n{:#?}",files);
-				match (self.handler)(self.dropboxes.clone(),files).await {
+				match (self.handler)(self.dropboxes.clone(),files,self.data.clone()).await {
 					// need a way to break the loop for fatal errors!!
 					Ok(()) => {},
 					Err(e) => {
 						error!("{:?}",e);
-						break Err(e);
 					}
 				}
 			}
