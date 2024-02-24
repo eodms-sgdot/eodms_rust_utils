@@ -28,7 +28,7 @@ pub struct DropBoxes {
 	pub processed: PathBuf,
 }
 
-type HandlerFn<T> = Box<dyn Fn(DropBoxes,Vec<String>,T) -> BoxFuture<'static,Result<(),DropBoxError>> + Send + Sync>;
+type HandlerFn<T> = Box<dyn Fn(&DropBoxes,Vec<String>,T) -> BoxFuture<'static,Result<(),DropBoxError>> + Send + Sync>;
 
 pub struct DropBox<T> {
 	dropboxes: DropBoxes,
@@ -140,7 +140,7 @@ impl<T: Clone> DropBox<T> {
 			if !files.is_empty() {
 				info!("Processing {} files",files.len());
 				debug!("Files:\n{:#?}",files);
-				match (self.handler)(self.dropboxes.clone(),files,self.data.clone()).await {
+				match (self.handler)(&self.dropboxes,files,self.data.clone()).await {
 					// need a way to break the loop for fatal errors!!
 					Ok(()) => {},
 					Err(e) => {
