@@ -18,7 +18,7 @@ pub fn format_bytes<T: ToPrimitive>(bytes: T, width: Option<usize>, decimals: Op
 		None => return "".to_string()
 	};
 	let strlen = (float as i64).to_string().len();
-	let format_string = match strlen {
+	match strlen {
 		0..=3 => {
 			format!("{:>1$} B",float,width)
 		},
@@ -37,8 +37,7 @@ pub fn format_bytes<T: ToPrimitive>(bytes: T, width: Option<usize>, decimals: Op
 		_ => {
 			format!("{:>1$.2$} PiB",float/PIB as f64,width,decimals)
 		},
-	};
-	format_string
+	}
 }
 
 pub fn format_rate<T: PrimInt>(bytes: T, duration: f64, width: Option<usize>, decimals: Option<usize>) -> String {
