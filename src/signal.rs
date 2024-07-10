@@ -14,9 +14,15 @@ pub struct Signal {
 	sender: Sender<SignalType>,
 }
 
+const DEFAULT_CHANNEL_CAPACITY:usize = 16;
+
 impl Signal {
 	pub fn new() -> Self {
-		let (sender, _) = broadcast::channel(1);
+		let (sender, _) = broadcast::channel(DEFAULT_CHANNEL_CAPACITY);
+		Self { sender }
+	}
+	pub fn new_with_capacity(capacity: usize) -> Self {
+		let (sender, _) = broadcast::channel(capacity);
 		Self { sender }
 	}
 
@@ -46,6 +52,21 @@ mod tests {
 	#[tokio::test]
 	async fn signal() {
 		let signal = Signal::new();
+		let signal2 = signal.clone();
+		let r = tokio::spawn(async move {
+			run(signal2).await;
+		});
+		tokio::time::timeout(Duration::from_secs(3), async {
+			tokio::time::sleep(Duration::from_secs(1)).await;
+			signal.pause();
+			tokio::time::sleep(Duration::from_secs(1)).await;
+			signal.shutdown();
+			r.await.unwrap();
+		}).await.unwrap();
+	}
+	#[tokio::test]
+	async fn signal_with_capacity() {
+		let signal = Signal::new_with_capacity(4);
 		let signal2 = signal.clone();
 		let r = tokio::spawn(async move {
 			run(signal2).await;
