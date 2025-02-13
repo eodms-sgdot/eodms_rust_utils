@@ -1,3 +1,5 @@
+use futures::Future;
+use futures::future::BoxFuture;
 use log::{debug, error, info};
 use regex::Regex;
 use std::{fs, io::Error as IOError, path::PathBuf};
@@ -23,12 +25,12 @@ pub struct DropBoxes {
     pub processed: PathBuf,
 }
 
-type HandlerFn<T> = Box<dyn Fn(&DropBoxes, Vec<String>, &T) -> Result<(), DropBoxError>>;
+type BoxAsyncFn<T> = Box<dyn Fn(DropBoxes, Vec<String>, T) -> BoxFuture<'static, Result<(), DropBoxError>> + Send + Sync>;
 
 pub struct DropBox<T> {
     dropboxes: DropBoxes,
     target_filter: Option<Regex>,
-    handler: HandlerFn<T>,
+    handler: BoxAsyncFn<T>,
     data: T,
 }
 
@@ -65,11 +67,19 @@ impl From<IOError> for DropBoxError {
     }
 }
 
-impl<T: Clone> DropBox<T> {
-    pub fn new(
-        dirs: DropBoxDirs<'_>,
+pub fn box_async_fn<F, Fut, T>(f: F) -> BoxAsyncFn<T>
+where
+    F: Fn(DropBoxes, Vec<String>, T) -> Fut + Send + Sync + 'static,
+    Fut: Future<Output = Result<(), DropBoxError>> + Send + 'static,
+{
+    Box::new(move |a,b,c| Box::pin(f(a,b,c)))
+}
+
+impl<T: Clone + 'static> DropBox<T> {
+    pub fn new<'a>(
+        dirs: DropBoxDirs,
         rxstr: Option<String>,
-        handler: HandlerFn<T>,
+        handler: BoxAsyncFn<T>,
         data: T,
     ) -> Result<DropBox<T>, DropBoxError> {
         let rx = match rxstr {
@@ -144,7 +154,7 @@ impl<T: Clone> DropBox<T> {
             if !files.is_empty() {
                 info!("Processing {} files", files.len());
                 debug!("Files:\n{:#?}", files);
-                match (self.handler)(&self.dropboxes, files, &self.data) {
+                match (self.handler)(self.dropboxes.clone(), files, self.data.clone()).await {
                     // need a way to break the loop for fatal errors!!
                     Ok(()) => {}
                     Err(e) => {
