@@ -1,7 +1,8 @@
-use futures::Future;
 use futures::future::BoxFuture;
+use futures::Future;
 use log::{debug, error, info};
 use regex::Regex;
+use std::sync::Arc;
 use std::{fs, io::Error as IOError, path::PathBuf};
 use tokio::time::{sleep, Duration};
 use tokio_util::sync::CancellationToken;
@@ -23,15 +24,6 @@ pub struct DropBoxes {
     pub error: PathBuf,
     pub processing: PathBuf,
     pub processed: PathBuf,
-}
-
-type BoxAsyncFn<T> = Box<dyn Fn(DropBoxes, Vec<String>, T) -> BoxFuture<'static, Result<(), DropBoxError>> + Send + Sync>;
-
-pub struct DropBox<T> {
-    dropboxes: DropBoxes,
-    target_filter: Option<Regex>,
-    handler: BoxAsyncFn<T>,
-    data: T,
 }
 
 pub enum DropBoxDir {
@@ -67,21 +59,30 @@ impl From<IOError> for DropBoxError {
     }
 }
 
-pub fn box_async_fn<F, Fut, T>(f: F) -> BoxAsyncFn<T>
-where
-    F: Fn(DropBoxes, Vec<String>, T) -> Fut + Send + Sync + 'static,
-    Fut: Future<Output = Result<(), DropBoxError>> + Send + 'static,
-{
-    Box::new(move |a,b,c| Box::pin(f(a,b,c)))
+type DropBoxResult = Result<(), DropBoxError>;
+type Handler<T> = Box<
+    dyn Fn(Arc<DropBoxes>, Vec<String>, Arc<T>) -> BoxFuture<'static, DropBoxResult> + Send + Sync,
+>;
+
+pub struct DropBox<T> {
+    dropboxes: Arc<DropBoxes>,
+    target_filter: Option<Regex>,
+    handler: Handler<T>,
+    data: Arc<T>,
 }
 
 impl<T: Clone + 'static> DropBox<T> {
-    pub fn new<'a>(
+    //    fn new<H, Fut>(handler: H, data: T) -> Self
+    pub fn new<H, Fut>(
         dirs: DropBoxDirs,
         rxstr: Option<String>,
-        handler: BoxAsyncFn<T>,
+        handler: H,
         data: T,
-    ) -> Result<DropBox<T>, DropBoxError> {
+    ) -> Result<DropBox<T>, DropBoxError>
+    where
+        H: Fn(Arc<DropBoxes>, Vec<String>, Arc<T>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = DropBoxResult> + Send + 'static,
+    {
         let rx = match rxstr {
             Some(s) => Some(Regex::new(&s)?),
             None => None,
@@ -92,10 +93,11 @@ impl<T: Clone + 'static> DropBox<T> {
                 error: directory_exists(dirs.error)?,
                 processing: directory_exists(dirs.processing)?,
                 processed: directory_exists(dirs.processed)?,
-            },
+            }
+            .into(),
             target_filter: rx,
-            handler,
-            data,
+            handler: Box::new(move |a, b, c| Box::pin(handler(a, b, c))),
+            data: data.into(),
         })
     }
     pub async fn list(&self, dirtype: DropBoxDir) -> Result<Vec<String>, DropBoxError> {
