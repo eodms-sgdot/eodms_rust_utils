@@ -1,12 +1,16 @@
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum DirError {
     PathNotExist,
     PathNotDir,
     PathInvalid,
 }
 
+/// # Errors
+///
+/// Can return an error if the given directory path is invalid
 pub fn directory_exists(dir: &str) -> Result<PathBuf, DirError> {
     let path = Path::new(dir);
     if path.exists() {
@@ -20,11 +24,13 @@ pub fn directory_exists(dir: &str) -> Result<PathBuf, DirError> {
     }
 }
 
+/// # Errors
+///
+/// Can return an error if the given file path is invalid
 pub fn create_dest_path(dir: &Path, file: &Path) -> Result<PathBuf, DirError> {
     let mut new_path = PathBuf::from(dir);
-    let file = match Path::new(file).file_name() {
-        Some(f) => f,
-        None => return Err(DirError::PathInvalid),
+    let Some(file) = Path::new(file).file_name() else {
+        return Err(DirError::PathInvalid);
     };
     new_path.push(file);
     Ok(new_path)
