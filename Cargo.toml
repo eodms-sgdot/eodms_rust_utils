@@ -1,7 +1,13 @@
 [package]
 name = "eodms_rust_utils"
-version = "0.1.8"
+description = "Various utilities like dropbox handling, file and directory helpers, and size and rate formatting"
+categories = ["filesystem","value-formatting"]
+version = "0.2.0"
 edition = "2021"
+keywords = ["Dropbox","Formatting"]
+license = "OGL"
+readme = "README.md"
+repository = "https://github.com/eodms-sgdot/eodms_rust_utils"
 
 [dependencies]
 futures = "0.3"
@@ -10,3 +16,15 @@ num-traits = "0.2"
 regex = "1"
 tokio = { version = "1", features = ["sync", "time", "macros", "rt-multi-thread"] }
 tokio-util = "0.7"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+unwrap_used = { level = "warn" }
+exhaustive_enums = "warn"
+std_instead_of_core = "warn"
+absolute_paths = "warn"
+let_underscore_untyped = "warn"
+cargo = { level = "warn", priority = 2 }
+indexing_slicing = { level = "warn", priority = 2 }
+string_slice = { level = "warn", priority = 2 }
