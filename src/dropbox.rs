@@ -2,6 +2,7 @@ use futures::future::BoxFuture;
 use futures::Future;
 use log::{debug, error, info};
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use std::{
     fs,
     io::Error as IOError,
@@ -23,6 +24,7 @@ pub struct DropBoxDirs<'a> {
     pub processed: &'a str,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub struct FilePaths {
     pub filename: String,
     pub error: PathBuf,
