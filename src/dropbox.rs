@@ -115,6 +115,7 @@ type Handler<T> = Box<
 >;
 
 pub struct DropBox<T> {
+    name: String,
     dropboxes: Arc<DropBoxes>,
     target_filter: Option<Regex>,
     handler: Handler<T>,
@@ -126,6 +127,7 @@ impl<T: Clone + 'static> DropBox<T> {
     ///
     /// Can return an error if the given regex is bad or if a dropbox directory does not exist
     pub fn new<H, Fut>(
+        name: String,
         dirs: &DropBoxDirs,
         rxstr: Option<String>,
         handler: H,
@@ -140,6 +142,7 @@ impl<T: Clone + 'static> DropBox<T> {
             None => None,
         };
         Ok(DropBox {
+            name,
             dropboxes: DropBoxes {
                 target: directory_exists(dirs.target)?,
                 error: directory_exists(dirs.error)?,
@@ -206,7 +209,8 @@ impl<T: Clone + 'static> DropBox<T> {
             Duration::from_millis(DEFAULT_SLEEP_INTERVAL)
         };
         info!(
-            "Dropbox monitor sleeping {} milliseconds for every iteration",
+            "Dropbox monitor {} sleeping {} milliseconds for every iteration",
+            self.name,
             sleep_time.as_millis()
         );
         loop {
