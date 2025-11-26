@@ -3,9 +3,9 @@ use std::path::{Path, PathBuf};
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum DirError {
-    PathNotExist,
-    PathNotDir,
-    PathInvalid,
+    PathNotExist(String),
+    PathNotDir(String),
+    PathInvalid(String),
 }
 
 /// # Errors
@@ -17,10 +17,10 @@ pub fn directory_exists(dir: &str) -> Result<PathBuf, DirError> {
         if path.is_dir() {
             Ok(path.to_path_buf())
         } else {
-            Err(DirError::PathNotDir)
+            Err(DirError::PathNotDir(dir.to_string()))
         }
     } else {
-        Err(DirError::PathNotExist)
+        Err(DirError::PathNotExist(dir.to_string()))
     }
 }
 
@@ -30,7 +30,7 @@ pub fn directory_exists(dir: &str) -> Result<PathBuf, DirError> {
 pub fn create_dest_path(dir: &Path, file: &Path) -> Result<PathBuf, DirError> {
     let mut new_path = PathBuf::from(dir);
     let Some(file) = Path::new(file).file_name() else {
-        return Err(DirError::PathInvalid);
+        return Err(DirError::PathInvalid(file.display().to_string()));
     };
     new_path.push(file);
     Ok(new_path)
