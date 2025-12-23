@@ -4,6 +4,7 @@ use log::{debug, error, info};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashMap,
     fs,
     io::Error as IOError,
     path::{Path, PathBuf},
@@ -22,6 +23,7 @@ pub struct DropBoxDirs<'a> {
     pub error: &'a str,
     pub processing: &'a str,
     pub processed: &'a str,
+    pub other: Option<HashMap<&'a str, &'a str>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
@@ -38,6 +40,7 @@ pub struct DropBoxes {
     pub error: PathBuf,
     pub processing: PathBuf,
     pub processed: PathBuf,
+    pub other: Option<HashMap<String, PathBuf>>,
 }
 
 impl DropBoxes {
@@ -79,6 +82,7 @@ pub enum DropBoxDir {
     Error,
     Processing,
     Processed,
+    Other(PathBuf),
 }
 
 #[derive(Debug)]
@@ -141,6 +145,18 @@ impl<T: Clone + 'static> DropBox<T> {
             Some(s) => Some(Regex::new(&s)?),
             None => None,
         };
+        let other: Result<Option<HashMap<String, PathBuf>>, DropBoxError> = dirs
+            .other
+            .as_ref()
+            .map(|hm| {
+                hm.iter()
+                    .map(|(k, v)| {
+                        let pathbuf = directory_exists(v)?;
+                        Ok(((*k).to_string(), pathbuf))
+                    })
+                    .collect::<Result<HashMap<_, _>, _>>()
+            })
+            .transpose();
         Ok(DropBox {
             name,
             dropboxes: DropBoxes {
@@ -148,6 +164,7 @@ impl<T: Clone + 'static> DropBox<T> {
                 error: directory_exists(dirs.error)?,
                 processing: directory_exists(dirs.processing)?,
                 processed: directory_exists(dirs.processed)?,
+                other: other?,
             }
             .into(),
             target_filter: rx,
@@ -165,6 +182,7 @@ impl<T: Clone + 'static> DropBox<T> {
             DropBoxDir::Error => &self.dropboxes.error,
             DropBoxDir::Processing => &self.dropboxes.processing,
             DropBoxDir::Processed => &self.dropboxes.processed,
+            DropBoxDir::Other(p) => p,
         };
         let mut files = vec![];
         for entry in fs::read_dir(dir)? {
