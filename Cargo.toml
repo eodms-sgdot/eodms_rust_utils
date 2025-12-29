@@ -2,7 +2,7 @@
 name = "eodms_rust_utils"
 description = "Various utilities like dropbox handling, file and directory helpers, and size and rate formatting"
 categories = ["filesystem","value-formatting"]
-version = "0.2.3"
+version = "0.2.4"
 edition = "2021"
 keywords = ["Dropbox","Formatting"]
 license = "OGL"
