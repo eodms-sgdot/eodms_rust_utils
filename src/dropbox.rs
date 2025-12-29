@@ -34,7 +34,7 @@ pub struct FilePaths {
     pub processed: PathBuf,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DropBoxes {
     pub target: PathBuf,
     pub error: PathBuf,
